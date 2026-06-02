@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+import { LanguageProvider } from './hooks/useLanguage';
 import Login from './pages/Login';
 import App from './pages/App';
 
@@ -13,7 +14,9 @@ function Root() {
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <AuthProvider>
-      <Root />
+      <LanguageProvider>
+        <Root />
+      </LanguageProvider>
     </AuthProvider>
   </React.StrictMode>
 );

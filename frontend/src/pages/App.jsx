@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useLanguage } from '../hooks/useLanguage';
+import { roleBadge } from '../components/ui';
 import Overview  from './Overview';
 import Products  from './Products';
 import Parts     from './Parts';
@@ -10,14 +12,14 @@ import Users     from './Users';
 import Settings  from './Settings';
 
 const TABS = [
-  { id: 'overview',  label: 'Overview',  icon: 'ti-layout-dashboard' },
-  { id: 'products',  label: 'Products',  icon: 'ti-cpu' },
-  { id: 'inventory', label: 'Parts',     icon: 'ti-box' },
-  { id: 'sales',     label: 'Sales',     icon: 'ti-receipt' },
-  { id: 'clients',   label: 'Clients',   icon: 'ti-users' },
-  { id: 'audit',     label: 'Audit log', icon: 'ti-history' },
-  { id: 'users',     label: 'Users',     icon: 'ti-shield-lock', adminOnly: true },
-  { id: 'settings',  label: 'Settings',  icon: 'ti-settings',    adminOnly: true },
+  { id: 'overview',  labelKey: 'overview',  icon: 'ti-layout-dashboard' },
+  { id: 'products',  labelKey: 'products',  icon: 'ti-cpu' },
+  { id: 'inventory', labelKey: 'inventory', icon: 'ti-box' },
+  { id: 'sales',     labelKey: 'sales',     icon: 'ti-receipt' },
+  { id: 'clients',   labelKey: 'clients',   icon: 'ti-users' },
+  { id: 'audit',     labelKey: 'audit',     icon: 'ti-history' },
+  { id: 'users',     labelKey: 'users',     icon: 'ti-shield-lock', adminOnly: true },
+  { id: 'settings',  labelKey: 'settings',  icon: 'ti-settings',    adminOnly: true },
 ];
 
 function initials(name = '') {
@@ -26,6 +28,7 @@ function initials(name = '') {
 
 export default function App() {
   const { user, logout, isAdmin } = useAuth();
+  const { lang, setLang, t } = useLanguage();
   const [tab, setTab] = useState('overview');
 
   const pages = {
@@ -44,22 +47,36 @@ export default function App() {
       <div className="topbar">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <i className="ti ti-building-factory-2" style={{ fontSize: 20, color: 'var(--color-text-secondary)' }} />
-          <span style={{ fontSize: 15, fontWeight: 500 }}>Manufacturing Dashboard</span>
+          <span style={{ fontSize: 15, fontWeight: 500 }}>{t('title')}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className={`badge badge-${user.role}`}>{user.role}</span>
+          <button
+            className="btn btn-sm"
+            style={lang === 'ro' ? { fontWeight: 700 } : { opacity: 0.7 }}
+            onClick={() => setLang('ro')}
+          >
+            RO
+          </button>
+          <button
+            className="btn btn-sm"
+            style={lang === 'en' ? { fontWeight: 700 } : { opacity: 0.7 }}
+            onClick={() => setLang('en')}
+          >
+            EN
+          </button>
+          {roleBadge(user.role, t)}
           <div className={`avatar avatar-${user.role}`}>{initials(user.fullname)}</div>
           <span style={{ fontSize: 13, fontWeight: 500 }}>{user.fullname}</span>
           <button className="btn btn-sm" onClick={logout}>
-            <i className="ti ti-logout" /> Sign out
+            <i className="ti ti-logout" /> {t('signOut')}
           </button>
         </div>
       </div>
 
       <div className="tabs">
-        {TABS.filter(t => !t.adminOnly || isAdmin).map(t => (
-          <button key={t.id} className={`tab${tab === t.id ? ' active' : ''}`} onClick={() => setTab(t.id)}>
-            <i className={`ti ${t.icon}`} /> {t.label}
+        {TABS.filter(tabItem => !tabItem.adminOnly || isAdmin).map(tabItem => (
+          <button key={tabItem.id} className={`tab${tab === tabItem.id ? ' active' : ''}`} onClick={() => setTab(tabItem.id)}>
+            <i className={`ti ${tabItem.icon}`} /> {tabItem.labelKey ? t(tabItem.labelKey) : tabItem.label}
           </button>
         ))}
       </div>

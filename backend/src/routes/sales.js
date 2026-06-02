@@ -6,32 +6,27 @@ const { logAudit } = require('./audit');
 /* ── helpers ── */
 async function checkStock(client, productId, qty) {
   const { rows } = await client.query(
-    `SELECT p.name, b.qty * $2 AS needed, pt.qty AS have, pt.name AS part_name
-     FROM bom b
-     JOIN parts pt ON pt.id = b.part_id
-     JOIN products p ON p.id = b.product_id
-     WHERE b.product_id = $1`,
-    [productId, qty]
+    `SELECT p.name, p.qty AS have
+     FROM products p
+     WHERE p.id = $1`,
+    [productId]
   );
-  const issues = rows.filter(r => r.have < r.needed)
-    .map(r => `${r.part_name}: need ${r.needed}, have ${r.have}`);
+  const product = rows[0];
+  if (!product) return { ok: false, issues: ['Product not found'] };
+  const issues = product.have < qty ? [`${product.name}: need ${qty}, have ${product.have}`] : [];
   return { ok: issues.length === 0, issues };
 }
 
 async function deductStock(client, productId, qty) {
   await client.query(
-    `UPDATE parts SET qty = parts.qty - (b.qty * $2)
-     FROM bom b
-     WHERE parts.id = b.part_id AND b.product_id = $1`,
+    'UPDATE products SET qty = qty - $2 WHERE id = $1',
     [productId, qty]
   );
 }
 
 async function restoreStock(client, productId, qty) {
   await client.query(
-    `UPDATE parts SET qty = parts.qty + (b.qty * $2)
-     FROM bom b
-     WHERE parts.id = b.part_id AND b.product_id = $1`,
+    'UPDATE products SET qty = qty + $2 WHERE id = $1',
     [productId, qty]
   );
 }

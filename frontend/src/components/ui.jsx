@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLanguage } from '../hooks/useLanguage';
 
 export function Modal({ open, onClose, title, children, wide }) {
   if (!open) return null;
@@ -20,19 +21,31 @@ export function Badge({ variant, children }) {
   return <span className={`badge badge-${variant}`}>{children}</span>;
 }
 
-export function stockBadge(qty, min) {
-  if (qty === 0) return <Badge variant="out">Out of stock</Badge>;
-  if (qty < min) return <Badge variant="low">Low</Badge>;
-  return <Badge variant="ok">OK</Badge>;
+export function stockBadge(qty, min, t = (key) => key) {
+  if (qty === 0) return <Badge variant="out">{t('productStockOut')}</Badge>;
+  if (qty < min) return <Badge variant="low">{t('productStockLow')}</Badge>;
+  return <Badge variant="ok">{t('productStockOk')}</Badge>;
 }
 
-export function saleBadge(status) {
+export function productStockBadge(stock, t = (key) => key) {
+  if (stock === 0) return <Badge variant="out">{t('productStockOut')}</Badge>;
+  if (stock < 3) return <Badge variant="low">{t('productStockLow')}</Badge>;
+  return <Badge variant="ok">{t('productStockOk')}</Badge>;
+}
+
+export function saleBadge(status, label = status) {
   const map = { Paid: 'paid', Pending: 'pending', Aborted: 'aborted', Refunded: 'refunded' };
-  return <Badge variant={map[status] || 'pending'}>{status}</Badge>;
+  return <Badge variant={map[status] || 'pending'}>{label}</Badge>;
 }
 
-export function roleBadge(role) {
-  return <Badge variant={role}>{role}</Badge>;
+export function roleBadge(role, t = (key) => key) {
+  const label = role === 'admin'
+    ? t('userRoleAdmin')
+    : role === 'user'
+      ? t('userRoleUser')
+      : t(role);
+
+  return <Badge variant={role}>{label}</Badge>;
 }
 
 export function Btn({ variant = '', sm, onClick, disabled, children, type = 'button' }) {
@@ -83,14 +96,15 @@ export function useConfirm() {
   }
 
   function ConfirmDialog() {
+    const { t } = useLanguage();
     if (!state) return null;
     return (
-      <Modal open title="Confirm action" onClose={() => setState(null)}>
+      <Modal open title={t('confirmAction')} onClose={() => setState(null)}>
         <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 0 }}>{state.message}</p>
         <ModalActions>
-          <Btn onClick={() => setState(null)}>Cancel</Btn>
+          <Btn onClick={() => setState(null)}>{t('cancel')}</Btn>
           <Btn variant={state.danger ? 'danger' : 'primary'} onClick={() => { state.onOk(); setState(null); }}>
-            Confirm
+            {t('confirm')}
           </Btn>
         </ModalActions>
       </Modal>
@@ -100,7 +114,7 @@ export function useConfirm() {
   return { confirm, ConfirmDialog };
 }
 
-export function fmt(n) { return '€' + Number(n).toFixed(2); }
+export function fmt(n) { return 'RON ' + Number(n).toFixed(2); }
 
 export function PermNotice({ children }) {
   return (
@@ -112,7 +126,8 @@ export function PermNotice({ children }) {
 }
 
 export function Spinner() {
-  return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-secondary)' }}>Loading…</div>;
+  const { t } = useLanguage();
+  return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-secondary)' }}>{t('loading')}</div>;
 }
 
 export function ErrorMsg({ msg }) {

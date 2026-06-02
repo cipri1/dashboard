@@ -13,14 +13,14 @@ router.get('/', auth, async (req, res) => {
 });
 
 router.post('/', auth, adminOnly, async (req, res) => {
-  const { name, sku, price, description, bom } = req.body;
+  const { name, sku, price, description, qty, bom } = req.body;
   if (!name || !sku) return res.status(400).json({ error: 'Name and SKU required' });
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
-      'INSERT INTO products (name,sku,price,description) VALUES ($1,$2,$3,$4) RETURNING *',
-      [name, sku, price || 0, description || '']
+      'INSERT INTO products (name,sku,price,description,qty) VALUES ($1,$2,$3,$4,$5) RETURNING *',
+      [name, sku, price || 0, description || '', qty || 0]
     );
     const product = rows[0];
     if (bom?.length) {
@@ -44,13 +44,13 @@ router.post('/', auth, adminOnly, async (req, res) => {
 });
 
 router.put('/:id', auth, adminOnly, async (req, res) => {
-  const { name, sku, price, description, bom } = req.body;
+  const { name, sku, price, description, qty, bom } = req.body;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
-      'UPDATE products SET name=$1,sku=$2,price=$3,description=$4 WHERE id=$5 RETURNING *',
-      [name, sku, price, description, req.params.id]
+      'UPDATE products SET name=$1,sku=$2,price=$3,description=$4,qty=$5 WHERE id=$6 RETURNING *',
+      [name, sku, price, description, qty || 0, req.params.id]
     );
     if (!rows.length) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Not found' }); }
     await client.query('DELETE FROM bom WHERE product_id=$1', [req.params.id]);

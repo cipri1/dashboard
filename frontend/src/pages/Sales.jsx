@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
+import { useLanguage } from '../hooks/useLanguage';
 import { Card, Modal, ModalActions, Btn, FormRow, Field, fmt, saleBadge, useConfirm, Spinner, ErrorMsg } from '../components/ui';
 
 const emptySale = { date: new Date().toISOString().slice(0, 10), product_id: '', client_id: '', qty: 1, price: '', status: 'Pending' };
 
 export default function Sales() {
   const { isAdmin } = useAuth();
+  const { t } = useLanguage();
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
   const [clients, setClients] = useState([]);
@@ -65,14 +67,14 @@ export default function Sales() {
       const blob = await api.getSaleLabel(s.id);
       const url = URL.createObjectURL(blob);
       const win = window.open(url, '_blank');
-      if (!win) throw new Error('Please allow popups to open the label');
+      if (!win) throw new Error(t('allowPopups'));
     } catch (e) {
       alert(e.message);
     }
   }
 
   function del(s) {
-    confirm(`Delete sale #${s.id}?`, async () => {
+    confirm(t('deleteSaleQuestion', { id: s.id }), async () => {
       try { await api.deleteSale(s.id); load(); } catch (e) { alert(e.message); }
     });
   }
@@ -86,9 +88,9 @@ export default function Sales() {
     Refunded: [],
   };
   const transitionLabels = {
-    Paid:     { label: 'Mark as Paid', sub: 'Parts will be deducted from stock', variant: 'success' },
-    Aborted:  { label: 'Abort sale',   sub: 'No stock deducted — sale cancelled', variant: 'warn' },
-    Refunded: { label: 'Refund / Reverse', sub: 'Parts will be restored to stock', variant: 'danger' },
+    Paid:     { label: t('markAsPaid'), sub: t('partsDeductedImmediately'), variant: 'success' },
+    Aborted:  { label: t('abortSale'), sub: t('noStockDeductedSaleCancelled'), variant: 'warn' },
+    Refunded: { label: t('refundReverse'), sub: t('partsRestoredOnRefund'), variant: 'danger' },
   };
 
   if (loading) return <Spinner />;
@@ -96,21 +98,21 @@ export default function Sales() {
   return (
     <>
       <div className="card" style={{ background: 'var(--color-background-secondary)', border: 'none', padding: '10px 14px', marginBottom: '1rem' }}>
-        <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 6 }}>Sale status lifecycle</div>
+        <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 6 }}>{t('saleStatusLifecycle')}</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 12 }}>
-          <span className="badge badge-pending">Pending</span> <span style={{ color: 'var(--color-text-tertiary)' }}>→</span>
-          <span className="badge badge-paid">Paid</span> <span style={{ color: 'var(--color-text-tertiary)' }}>&nbsp;or&nbsp;</span>
-          <span className="badge badge-pending">Pending</span> <span style={{ color: 'var(--color-text-tertiary)' }}>→</span>
-          <span className="badge badge-aborted">Aborted</span>
-          <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 8 }}>· Paid →</span>
-          <span className="badge badge-refunded">Refunded</span>
-          <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 8, fontSize: 11 }}>(stock restored on Refund)</span>
+          <span className="badge badge-pending">{t('statusPending')}</span> <span style={{ color: 'var(--color-text-tertiary)' }}>→</span>
+          <span className="badge badge-paid">{t('statusPaid')}</span> <span style={{ color: 'var(--color-text-tertiary)' }}>&nbsp;{t('or')}&nbsp;</span>
+          <span className="badge badge-pending">{t('statusPending')}</span> <span style={{ color: 'var(--color-text-tertiary)' }}>→</span>
+          <span className="badge badge-aborted">{t('statusAborted')}</span>
+          <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 8 }}>· {t('statusPaid')} →</span>
+          <span className="badge badge-refunded">{t('statusRefunded')}</span>
+          <span style={{ color: 'var(--color-text-tertiary)', marginLeft: 8, fontSize: 11 }}>({t('stockRestoredOnRefund')})</span>
         </div>
       </div>
 
-      <Card title="Sales records" action={<Btn variant="primary" sm onClick={openAdd}><i className="ti ti-plus" /> Record sale</Btn>}>
+      <Card title={t('salesRecords')} action={<Btn variant="primary" sm onClick={openAdd}><i className="ti ti-plus" /> {t('recordSale')}</Btn>}>
         <table>
-          <thead><tr><th>Date</th><th>Product</th><th>Client</th><th>Qty</th><th>Price</th><th>Total</th><th>Status</th><th>By</th><th>Actions</th></tr></thead>
+          <thead><tr><th>{t('date')}</th><th>{t('saleProduct')}</th><th>{t('saleClient')}</th><th>{t('saleQty')}</th><th>{t('salePrice')}</th><th>{t('saleTotal')}</th><th>{t('status')}</th><th>{t('by')}</th><th>{t('actions')}</th></tr></thead>
           <tbody>{sales.map(s => {
             const locked = s.status === 'Aborted' || s.status === 'Refunded';
             return (
@@ -121,12 +123,12 @@ export default function Sales() {
                 <td>{s.qty}</td>
                 <td>{fmt(s.price)}</td>
                 <td style={{ fontWeight: 500 }}>{fmt(s.qty * s.price)}</td>
-                <td>{saleBadge(s.status)}</td>
+                <td>{saleBadge(s.status, t(`status${s.status}`))}</td>
                 <td style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{s.recorded_by_name}</td>
                 <td><div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                  {s.status === 'Paid' && <Btn sm variant="success" onClick={() => printLabel(s)}><i className="ti ti-send" /> Label</Btn>}
-                  {!locked && <Btn sm onClick={() => setStatusSale(s)}><i className="ti ti-arrows-exchange" /> Status</Btn>}
-                  {isAdmin && locked && <Btn sm variant="danger" onClick={() => del(s)}><i className="ti ti-trash" /></Btn>}
+                  {s.status === 'Paid' && <Btn sm variant="success" onClick={() => printLabel(s)}><i className="ti ti-send" /> {t('labelPrint')}</Btn>}
+                  {!locked && <Btn sm onClick={() => setStatusSale(s)}><i className="ti ti-arrows-exchange" /> {t('statusChange')}</Btn>}
+                  {isAdmin && locked && <Btn sm variant="danger" onClick={() => del(s)}><i className="ti ti-trash" /> {t('delete')}</Btn>}
                 </div></td>
               </tr>
             );
@@ -135,56 +137,56 @@ export default function Sales() {
       </Card>
 
       {/* Record sale modal */}
-      <Modal open={open} onClose={() => setOpen(false)} title="Record sale">
+      <Modal open={open} onClose={() => setOpen(false)} title={t('recordSale')}>
         {stockWarn && <div style={{ background: '#FAEEDA', border: '0.5px solid #FAC775', borderRadius: 'var(--border-radius-md)', padding: '10px 14px', fontSize: 12, color: '#633806', marginBottom: 10 }}>
           <i className="ti ti-alert-triangle" /> {stockWarn}
         </div>}
         <FormRow cols={2}>
-          <Field label="Product">
+          <Field label={t('saleProduct')}>
             <select value={form.product_id} onChange={handleProductChange}>
               {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </Field>
-          <Field label="Client">
+          <Field label={t('saleClient')}>
             <select value={form.client_id} onChange={f('client_id')}>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </Field>
         </FormRow>
         <FormRow cols={3}>
-          <Field label="Date"><input type="date" value={form.date} onChange={f('date')} /></Field>
-          <Field label="Qty"><input type="number" min="1" value={form.qty} onChange={f('qty')} /></Field>
-          <Field label="Unit price (€)"><input type="number" min="0" step="0.01" value={form.price} onChange={f('price')} /></Field>
+          <Field label={t('date')}><input type="date" value={form.date} onChange={f('date')} /></Field>
+          <Field label={t('saleQty')}><input type="number" min="1" value={form.qty} onChange={f('qty')} /></Field>
+          <Field label={t('salePrice')}><input type="number" min="0" step="0.01" value={form.price} onChange={f('price')} /></Field>
         </FormRow>
         <FormRow>
-          <Field label="Initial status">
+          <Field label={t('saleStatusField')}>
             <select value={form.status} onChange={f('status')}>
-              <option value="Pending">Pending — payment awaited</option>
-              <option value="Paid">Paid — parts deducted immediately</option>
+              <option value="Pending">{t('statusPendingOption')}</option>
+              <option value="Paid">{t('statusPaidOption')}</option>
             </select>
           </Field>
         </FormRow>
         <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 10, padding: '8px 10px', background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)' }}>
-          <i className="ti ti-info-circle" style={{ fontSize: 13 }} /> Parts are deducted only when status is <strong>Paid</strong>.
+          <i className="ti ti-info-circle" style={{ fontSize: 13 }} /> {t('saleInfoPaid')}
         </div>
         <ErrorMsg msg={err} />
         <ModalActions>
-          <Btn onClick={() => setOpen(false)}>Cancel</Btn>
-          <Btn variant="primary" onClick={save}>Save sale</Btn>
+          <Btn onClick={() => setOpen(false)}>{t('cancel')}</Btn>
+          <Btn variant="primary" onClick={save}>{t('saveSale')}</Btn>
         </ModalActions>
       </Modal>
 
       {/* Status change modal */}
       {statusSale && (
-        <Modal open onClose={() => setStatusSale(null)} title={`Update sale #${statusSale.id}`}>
+        <Modal open onClose={() => setStatusSale(null)} title={t('updateSaleTitle', { id: statusSale.id })}>
           <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: '1rem', padding: 10, background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)' }}>
             <strong style={{ fontWeight: 500 }}>{statusSale.product_name}</strong> × {statusSale.qty} &nbsp;·&nbsp; {statusSale.client_name} &nbsp;·&nbsp; {fmt(statusSale.qty * statusSale.price)}
-            <br /><span style={{ marginTop: 4, display: 'inline-block' }}>Current: {saleBadge(statusSale.status)}</span>
+            <br /><span style={{ marginTop: 4, display: 'inline-block' }}>{t('current')}: {saleBadge(statusSale.status, t(`status${statusSale.status}`))}</span>
           </div>
-          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: 8 }}>Choose new status:</div>
+          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: 8 }}>{t('chooseNewStatus')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {(transitions[statusSale.status] || []).length === 0
-              ? <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>This sale is locked and cannot be changed further.</div>
+              ? <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{t('saleLockedCannotChange')}</div>
               : transitions[statusSale.status].map(st => {
                 const info = transitionLabels[st];
                 return (
@@ -196,7 +198,7 @@ export default function Sales() {
                 );
               })}
           </div>
-          <ModalActions><Btn onClick={() => setStatusSale(null)}>Cancel</Btn></ModalActions>
+          <ModalActions><Btn onClick={() => setStatusSale(null)}>{t('cancel')}</Btn></ModalActions>
         </Modal>
       )}
 

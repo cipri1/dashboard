@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
+import { useLanguage } from '../hooks/useLanguage';
 import { Card, Modal, ModalActions, Btn, FormRow, Field, roleBadge, useConfirm, Spinner, ErrorMsg } from '../components/ui';
 
 const empty = { username: '', fullname: '', password: '', role: 'user' };
 
 export default function Users() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [users, setUsers] = useState([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty);
@@ -24,7 +26,7 @@ export default function Users() {
   }
 
   function del(u) {
-    confirm(`Remove user "${u.username}"?`, async () => {
+    confirm(t('removeUserQuestion', { username: u.username }), async () => {
       try { await api.deleteUser(u.id); load(); } catch (e) { alert(e.message); }
     });
   }
@@ -35,42 +37,42 @@ export default function Users() {
 
   return (
     <>
-      <Card title="User management" action={<Btn variant="primary" sm onClick={() => { setForm(empty); setErr(''); setOpen(true); }}><i className="ti ti-plus" /> Add user</Btn>}>
+      <Card title={t('usersManagement')} action={<Btn variant="primary" sm onClick={() => { setForm(empty); setErr(''); setOpen(true); }}><i className="ti ti-plus" /> {t('addUser')}</Btn>}>
         <table>
-          <thead><tr><th>Username</th><th>Full name</th><th>Role</th><th>Last login</th><th>Actions</th></tr></thead>
+          <thead><tr><th>{t('usernameLabel')}</th><th>{t('fullnameLabel')}</th><th>{t('roleLabel')}</th><th>{t('lastLogin')}</th><th>{t('actions')}</th></tr></thead>
           <tbody>{users.map(u => (
             <tr key={u.id}>
               <td style={{ fontWeight: 500 }}>{u.username}</td>
               <td>{u.fullname}</td>
-              <td>{roleBadge(u.role)}</td>
-              <td style={{ color: 'var(--color-text-secondary)', fontSize: 12 }}>{u.last_login ? new Date(u.last_login).toLocaleDateString() : 'Never'}</td>
+              <td>{roleBadge(u.role, t)}</td>
+              <td style={{ color: 'var(--color-text-secondary)', fontSize: 12 }}>{u.last_login ? new Date(u.last_login).toLocaleDateString() : t('never')}</td>
               <td>{u.id === user.id
-                ? <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>current user</span>
-                : <Btn sm variant="danger" onClick={() => del(u)}><i className="ti ti-trash" /> Remove</Btn>}
+                ? <span style={{ fontSize: 11, color: 'var(--color-text-tertiary)' }}>{t('currentUser')}</span>
+                : <Btn sm variant="danger" onClick={() => del(u)}><i className="ti ti-trash" /> {t('removeUser')}</Btn>}
               </td>
             </tr>
           ))}</tbody>
         </table>
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title="Add user">
+      <Modal open={open} onClose={() => setOpen(false)} title={t('addUserTitle')}>
         <FormRow cols={2}>
-          <Field label="Username"><input value={form.username} onChange={f('username')} placeholder="jdoe" /></Field>
-          <Field label="Full name"><input value={form.fullname} onChange={f('fullname')} placeholder="Jane Doe" /></Field>
+          <Field label={t('usernameLabel')}><input value={form.username} onChange={f('username')} placeholder={t('usernameExample')} /></Field>
+          <Field label={t('fullnameLabel')}><input value={form.fullname} onChange={f('fullname')} placeholder={t('fullnameExample')} /></Field>
         </FormRow>
         <FormRow cols={2}>
-          <Field label="Password"><input type="password" value={form.password} onChange={f('password')} /></Field>
-          <Field label="Role">
+          <Field label={t('passwordLabel')}><input type="password" value={form.password} onChange={f('password')} /></Field>
+          <Field label={t('roleLabel')}>
             <select value={form.role} onChange={f('role')}>
-              <option value="user">User</option>
-              <option value="admin">Admin</option>
+              <option value="user">{t('userRoleUser')}</option>
+              <option value="admin">{t('userRoleAdmin')}</option>
             </select>
           </Field>
         </FormRow>
         <ErrorMsg msg={err} />
         <ModalActions>
-          <Btn onClick={() => setOpen(false)}>Cancel</Btn>
-          <Btn variant="primary" onClick={save}>Save</Btn>
+          <Btn onClick={() => setOpen(false)}>{t('cancel')}</Btn>
+          <Btn variant="primary" onClick={save}>{t('save')}</Btn>
         </ModalActions>
       </Modal>
 

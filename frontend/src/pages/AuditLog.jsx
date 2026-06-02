@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import { Card, Spinner } from '../components/ui';
+import { Card, Spinner, roleBadge } from '../components/ui';
+import { useLanguage } from '../hooks/useLanguage';
 
 const ACTION_COLORS = {
   create: 'badge-create',
@@ -11,6 +12,7 @@ const ACTION_COLORS = {
 };
 
 export default function AuditLog() {
+  const { t } = useLanguage();
   const [log, setLog] = useState([]);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -30,30 +32,30 @@ export default function AuditLog() {
 
   return (
     <Card
-      title="Audit log"
+      title={t('auditLog')}
       action={
         <select value={filter} onChange={handleFilter} style={{ width: 140, fontSize: 12, padding: '5px 8px' }}>
-          <option value="">All actions</option>
-          <option value="create">Create</option>
-          <option value="edit">Edit</option>
-          <option value="delete">Delete</option>
-          <option value="status">Status change</option>
-          <option value="login">Login</option>
+          <option value="">{t('allActions')}</option>
+          <option value="create">{t('createAction')}</option>
+          <option value="edit">{t('editAction')}</option>
+          <option value="delete">{t('deleteAction')}</option>
+          <option value="status">{t('statusAction')}</option>
+          <option value="login">{t('loginAction')}</option>
         </select>
       }
     >
-      {loading ? <div style={{ padding: '1rem', color: 'var(--color-text-secondary)', fontSize: 13 }}>Loading…</div> : (
+      {loading ? <div style={{ padding: '1rem', color: 'var(--color-text-secondary)', fontSize: 13 }}>{t('loading')}</div> : (
         <table>
           <thead>
-            <tr><th>Time</th><th>User</th><th>Role</th><th>Action</th><th>Entity</th><th>Detail</th></tr>
+            <tr><th>{t('time')}</th><th>{t('user')}</th><th>{t('role')}</th><th>{t('action')}</th><th>{t('entity')}</th><th>{t('detail')}</th></tr>
           </thead>
           <tbody>
             {log.map(e => (
               <tr key={e.id}>
                 <td style={{ fontSize: 12, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>{new Date(e.ts).toLocaleString()}</td>
                 <td style={{ fontWeight: 500 }}>{e.username}</td>
-                <td><span className={`badge badge-${e.role}`}>{e.role}</span></td>
-                <td><span className={`badge ${ACTION_COLORS[e.action] || 'badge-status'}`}>{e.action}</span></td>
+                <td>{roleBadge(e.role, t)}</td>
+                <td><span className={`badge ${ACTION_COLORS[e.action] || 'badge-status'}`}>{t(`${e.action}Action`)}</span></td>
                 <td>{e.entity}</td>
                 <td style={{ fontSize: 12, color: 'var(--color-text-secondary)' }} title={e.detail}>{e.detail}</td>
               </tr>

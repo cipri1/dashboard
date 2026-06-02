@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
+import { useLanguage } from '../hooks/useLanguage';
 import { Card, Modal, ModalActions, Btn, FormRow, Field, fmt, stockBadge, useConfirm, PermNotice, Spinner, ErrorMsg } from '../components/ui';
 
 const empty = { name: '', sku: '', qty: 0, min_stock: 0, unit_cost: 0 };
 
 export default function Parts() {
   const { isAdmin } = useAuth();
+  const { t } = useLanguage();
   const [parts, setParts] = useState([]);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty);
@@ -31,7 +33,7 @@ export default function Parts() {
   }
 
   function del(p) {
-    confirm(`Delete part "${p.name}"? This cannot be undone.`, async () => {
+    confirm(t('deletePartQuestion', { name: p.name }), async () => {
       try { await api.deletePart(p.id); load(); } catch (e) { alert(e.message); }
     });
   }
@@ -42,10 +44,10 @@ export default function Parts() {
 
   return (
     <>
-      {!isAdmin && <PermNotice>Only admins can manage parts.</PermNotice>}
-      <Card title="Parts inventory" action={isAdmin && <Btn variant="primary" sm onClick={openAdd}><i className="ti ti-plus" /> Add part</Btn>}>
+      {!isAdmin && <PermNotice>{t('onlyAdminsCanManageParts')}</PermNotice>}
+      <Card title={t('partsInventory')} action={isAdmin && <Btn variant="primary" sm onClick={openAdd}><i className="ti ti-plus" /> {t('addPart')}</Btn>}>
         <table>
-          <thead><tr><th>Part name</th><th>SKU</th><th>Qty</th><th>Min.</th><th>Unit cost</th><th>Status</th>{isAdmin && <th>Actions</th>}</tr></thead>
+          <thead><tr><th>{t('partName')}</th><th>{t('partSku')}</th><th>{t('qtyInStock')}</th><th>{t('minStock')}</th><th>{t('unitCostRon')}</th><th>{t('status')}</th>{isAdmin && <th>{t('actions')}</th>}</tr></thead>
           <tbody>{parts.map(p => (
             <tr key={p.id}>
               <td>{p.name}</td>
@@ -63,20 +65,20 @@ export default function Parts() {
         </table>
       </Card>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Edit part' : 'Add part'}>
+      <Modal open={open} onClose={() => setOpen(false)} title={editing ? t('editPartTitle') : t('addPartTitle')}>
         <FormRow cols={2}>
-          <Field label="Part name"><input value={form.name} onChange={f('name')} placeholder="e.g. Capacitor 100µF" /></Field>
-          <Field label="SKU"><input value={form.sku} onChange={f('sku')} placeholder="e.g. CAP-100" /></Field>
+          <Field label={t('partName')}><input value={form.name} onChange={f('name')} placeholder={t('enterPartName')} /></Field>
+          <Field label={t('partSku')}><input value={form.sku} onChange={f('sku')} placeholder={t('enterPartSku')} /></Field>
         </FormRow>
         <FormRow cols={3}>
-          <Field label="Qty in stock"><input type="number" min="0" value={form.qty} onChange={f('qty')} /></Field>
-          <Field label="Min. stock"><input type="number" min="0" value={form.min_stock} onChange={f('min_stock')} /></Field>
-          <Field label="Unit cost (€)"><input type="number" min="0" step="0.01" value={form.unit_cost} onChange={f('unit_cost')} /></Field>
+          <Field label={t('qtyInStock')}><input type="number" min="0" value={form.qty} onChange={f('qty')} /></Field>
+          <Field label={t('minStock')}><input type="number" min="0" value={form.min_stock} onChange={f('min_stock')} /></Field>
+          <Field label={t('unitCostRon')}><input type="number" min="0" step="0.01" value={form.unit_cost} onChange={f('unit_cost')} /></Field>
         </FormRow>
         <ErrorMsg msg={err} />
         <ModalActions>
-          <Btn onClick={() => setOpen(false)}>Cancel</Btn>
-          <Btn variant="primary" onClick={save}>Save</Btn>
+          <Btn onClick={() => setOpen(false)}>{t('cancel')}</Btn>
+          <Btn variant="primary" onClick={save}>{t('save')}</Btn>
         </ModalActions>
       </Modal>
 

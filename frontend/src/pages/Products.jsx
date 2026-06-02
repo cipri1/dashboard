@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { useAuth } from '../hooks/useAuth';
-import { Card, Modal, ModalActions, Btn, FormRow, Field, fmt, useConfirm, PermNotice, Spinner, ErrorMsg } from '../components/ui';
+import { useLanguage } from '../hooks/useLanguage';
+import { Card, Modal, ModalActions, Btn, FormRow, Field, fmt, productStockBadge, useConfirm, PermNotice, Spinner, ErrorMsg } from '../components/ui';
 
-const emptyProd = { name: '', sku: '', price: '', description: '' };
+const emptyProd = { name: '', sku: '', price: '', description: '', qty: 0 };
 
 export default function Products() {
   const { isAdmin } = useAuth();
+  const { t } = useLanguage();
   const [products, setProducts] = useState([]);
   const [parts, setParts] = useState([]);
   const [open, setOpen] = useState(false);
@@ -25,7 +27,7 @@ export default function Products() {
 
   function openAdd() { setForm(emptyProd); setBom([]); setEditing(null); setErr(''); setOpen(true); }
   function openEdit(p) {
-    setForm({ name: p.name, sku: p.sku, price: p.price, description: p.description || '' });
+    setForm({ name: p.name, sku: p.sku, price: p.price, description: p.description || '', qty: p.qty || 0 });
     setBom(p.bom.map(b => ({ part_id: b.part_id, qty: b.qty })));
     setEditing(p.id); setErr(''); setOpen(true);
   }
@@ -37,7 +39,7 @@ export default function Products() {
   async function save() {
     setErr('');
     try {
-      const body = { ...form, price: parseFloat(form.price) || 0, bom };
+      const body = { ...form, price: parseFloat(form.price) || 0, qty: parseInt(form.qty, 10) || 0, bom };
       if (editing) await api.updateProduct(editing, body);
       else await api.createProduct(body);
       setOpen(false); load();
@@ -45,7 +47,7 @@ export default function Products() {
   }
 
   function del(p) {
-    confirm(`Delete product "${p.name}"?`, async () => {
+    confirm(t('deleteProductQuestion', { name: p.name }), async () => {
       try { await api.deleteProduct(p.id); load(); } catch (e) { alert(e.message); }
     });
   }
@@ -57,9 +59,9 @@ export default function Products() {
 
   return (
     <>
-      {!isAdmin && <PermNotice>Only admins can add, edit or delete products.</PermNotice>}
+      {!isAdmin && <PermNotice>{t('onlyAdminsCanAddEditDeleteProducts')}</PermNotice>}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
-        {isAdmin && <Btn variant="primary" sm onClick={openAdd}><i className="ti ti-plus" /> Add product</Btn>}
+        {isAdmin && <Btn variant="primary" sm onClick={openAdd}><i className="ti ti-plus" /> {t('addProduct')}</Btn>}
       </div>
 
       {products.map(prod => {
@@ -67,6 +69,7 @@ export default function Products() {
           const pt = parts.find(p => p.id === b.part_id);
           return a + (pt ? pt.unit_cost * b.qty : 0);
         }, 0);
+        const stock = prod.qty || 0;
         return (
           <div key={prod.id} className="product-card">
             <div className="product-card-header">
@@ -76,17 +79,17 @@ export default function Products() {
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
                 <div style={{ fontSize: 15, fontWeight: 500 }}>{fmt(prod.price)}</div>
-                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>margin {fmt(prod.price - bomCost)}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>{t('margin')} {fmt(prod.price - bomCost)}</div>
                 {isAdmin && <div style={{ display: 'flex', gap: 4, marginTop: 6, justifyContent: 'flex-end' }}>
                   <Btn sm onClick={() => openEdit(prod)}><i className="ti ti-edit" /></Btn>
                   <Btn sm variant="danger" onClick={() => del(prod)}><i className="ti ti-trash" /></Btn>
                 </div>}
               </div>
             </div>
-            <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>Parts per unit</div>
+            <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>{t('partsPerUnit')}</div>
             <div className="bom-list">
               {prod.bom.length === 0
-                ? <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>No parts defined</div>
+                ? <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)' }}>{t('noPartsDefined')}</div>
                 : prod.bom.map((b, i) => {
                   const pt = parts.find(p => p.id === b.part_id);
                   return (
@@ -98,29 +101,35 @@ export default function Products() {
                 })}
             </div>
             <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-text-secondary)' }}>
-              Parts cost per unit: <strong style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{fmt(bomCost)}</strong>
+              {t('partsCostPerUnit')} <strong style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{fmt(bomCost)}</strong>
+            </div>
+            <div style={{ marginTop: 4, fontSize: 12, color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>{t('productStock')}</span>
+              <strong style={{ fontWeight: 500 }}>{stock}</strong>
+              {productStockBadge(stock, t)}
             </div>
           </div>
         );
       })}
 
-      <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Edit product' : 'Add product'} wide>
+      <Modal open={open} onClose={() => setOpen(false)} title={editing ? t('editProduct') : t('addProduct')} wide>
         <FormRow cols={2}>
-          <Field label="Product name"><input value={form.name} onChange={f('name')} placeholder="e.g. Control board v2" /></Field>
-          <Field label="SKU / code"><input value={form.sku} onChange={f('sku')} placeholder="e.g. CB-002" /></Field>
+          <Field label={t('productName')}><input value={form.name} onChange={f('name')} placeholder={t('enterProductName')} /></Field>
+          <Field label={t('productSku')}><input value={form.sku} onChange={f('sku')} placeholder={t('enterSku')} /></Field>
         </FormRow>
-        <FormRow cols={2}>
-          <Field label="Sale price (€)"><input type="number" min="0" step="0.01" value={form.price} onChange={f('price')} /></Field>
-          <Field label="Description"><input value={form.description} onChange={f('description')} placeholder="Short description" /></Field>
+        <FormRow cols={3}>
+          <Field label={t('salePriceRon')}><input type="number" min="0" step="0.01" value={form.price} onChange={f('price')} /></Field>
+          <Field label={t('stock')}><input type="number" min="0" step="1" value={form.qty} onChange={f('qty')} /></Field>
+          <Field label={t('description')}><input value={form.description} onChange={f('description')} placeholder={t('enterDescription')} /></Field>
         </FormRow>
 
         <div style={{ marginBottom: 8 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <label style={{ margin: 0, fontWeight: 500, color: 'var(--color-text-primary)' }}>Bill of materials</label>
-            <Btn sm onClick={addBomRow}><i className="ti ti-plus" /> Add part</Btn>
+            <label style={{ margin: 0, fontWeight: 500, color: 'var(--color-text-primary)' }}>{t('billOfMaterials')}</label>
+            <Btn sm onClick={addBomRow}><i className="ti ti-plus" /> {t('addPart')}</Btn>
           </div>
           {bom.length === 0
-            ? <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', padding: '4px 0' }}>No parts added yet.</div>
+            ? <div style={{ fontSize: 12, color: 'var(--color-text-tertiary)', padding: '4px 0' }}>{t('noPartsAddedYet')}</div>
             : bom.map((row, i) => (
               <div key={i} className="bom-row">
                 <select value={row.part_id} onChange={e => updateBomRow(i, 'part_id', parseInt(e.target.value))} style={{ flex: 1 }}>
@@ -134,8 +143,8 @@ export default function Products() {
 
         <ErrorMsg msg={err} />
         <ModalActions>
-          <Btn onClick={() => setOpen(false)}>Cancel</Btn>
-          <Btn variant="primary" onClick={save}>Save product</Btn>
+          <Btn onClick={() => setOpen(false)}>{t('cancel')}</Btn>
+          <Btn variant="primary" onClick={save}>{t('saveProduct')}</Btn>
         </ModalActions>
       </Modal>
 
