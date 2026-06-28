@@ -79,7 +79,8 @@ export const api = {
   getAudit: (action) => request('GET', `/audit${action ? `?action=${action}` : ''}`),
 
   // Labels
-  getSaleLabel: (id) => requestBlob(`/label/sales/${id}/label`),
+  getSaleLabel: (id, lang) => requestBlob(`/label/sales/${id}/label?lang=${lang || 'en'}`),
+
 
   // Users
   getUsers:   ()      => request('GET',    '/users'),

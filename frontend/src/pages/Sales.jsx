@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useLanguage } from '../hooks/useLanguage';
 import { Card, Modal, ModalActions, Btn, FormRow, Field, fmt, saleBadge, useConfirm, Spinner, ErrorMsg } from '../components/ui';
 
-const emptySale = { date: new Date().toISOString().slice(0, 10), product_id: '', client_id: '', qty: 1, price: '', status: 'Pending' };
+const emptySale = { date: new Date().toISOString().slice(0, 10), client_id: '', items: [], status: 'Pending' };
 
 export default function Sales() {
   const { isAdmin } = useAuth();
@@ -64,7 +64,8 @@ export default function Sales() {
 
   async function printLabel(s) {
     try {
-      const blob = await api.getSaleLabel(s.id);
+      const currentLang = localStorage.getItem('app-language') || 'en';
+      const blob = await api.getSaleLabel(s.id, currentLang);
       const url = URL.createObjectURL(blob);
       const win = window.open(url, '_blank');
       if (!win) throw new Error(t('allowPopups'));
@@ -126,7 +127,7 @@ export default function Sales() {
                 <td>{saleBadge(s.status, t(`status${s.status}`))}</td>
                 <td style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{s.recorded_by_name}</td>
                 <td><div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                  {s.status === 'Paid' && <Btn sm variant="success" onClick={() => printLabel(s)}><i className="ti ti-send" /> {t('labelPrint')}</Btn>}
+                  {(s.status === 'Paid' || s.status === 'Pending') && <Btn sm variant="success" onClick={() => printLabel(s)}><i className="ti ti-send" /> {t('labelPrint')}</Btn>}
                   {!locked && <Btn sm onClick={() => setStatusSale(s)}><i className="ti ti-arrows-exchange" /> {t('statusChange')}</Btn>}
                   {isAdmin && locked && <Btn sm variant="danger" onClick={() => del(s)}><i className="ti ti-trash" /> {t('delete')}</Btn>}
                 </div></td>

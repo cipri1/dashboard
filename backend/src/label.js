@@ -11,12 +11,12 @@ function ensureReportlab() {
   }
 }
 
-function generateLabel({ sale, product, client, company }) {
+function generateLabel({ sale, product, client, company, lang = 'en' }) {
   ensureReportlab();
 
   const outPath = path.join(os.tmpdir(), `label_sale_${sale.id}_${Date.now()}.pdf`);
   const scriptPath = path.join(__dirname, 'generate_label.py');
-  const payload = JSON.stringify({ sale, product, client, company });
+  const payload = JSON.stringify({ sale, product, client, company, lang });
 
   const result = spawnSync('python3', [scriptPath, payload, outPath], {
     encoding: 'utf8',

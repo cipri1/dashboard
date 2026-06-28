@@ -34,11 +34,15 @@ async function restoreStock(client, productId, qty) {
 /* ── GET all sales ── */
 router.get('/', auth, async (req, res) => {
   const { rows } = await pool.query(`
-    SELECT s.*, p.name AS product_name, c.name AS client_name, u.username AS recorded_by_name
+    SELECT s.id, s.date, s.client_id, s.status, s.stock_deducted, s.recorded_by, s.created_at,
+           c.name AS client_name, u.username AS recorded_by_name,
+           json_agg(json_build_object('id', si.id, 'product_id', si.product_id, 'product_name', p.name, 'qty', si.qty, 'price', si.price)) AS items
     FROM sales s
-    LEFT JOIN products p ON p.id = s.product_id
+    LEFT JOIN sale_items si ON si.sale_id = s.id
+    LEFT JOIN products p ON p.id = si.product_id
     LEFT JOIN clients c ON c.id = s.client_id
     LEFT JOIN users u ON u.id = s.recorded_by
+    GROUP BY s.id, c.id, u.id
     ORDER BY s.date DESC, s.id DESC
   `);
   res.json(rows);
@@ -46,14 +50,22 @@ router.get('/', auth, async (req, res) => {
 
 /* ── POST create sale ── */
 router.post('/', auth, async (req, res) => {
-  const { date, status } = req.body;
-  const product_id = parseInt(req.body.product_id);
-  const client_id  = parseInt(req.body.client_id);
-  const qty        = parseInt(req.body.qty);
-  const price      = parseFloat(req.body.price);
+  const { date, status, client_id } = req.body;
+  let items = req.body.items; // Array of {product_id, qty, price}
+  
+  // Handle backward compatibility: if single product is sent
+  if (!items && req.body.product_id) {
+    items = [{
+      product_id: parseInt(req.body.product_id),
+      qty: parseInt(req.body.qty),
+      price: parseFloat(req.body.price)
+    }];
+  }
 
-  if (!product_id || !client_id || !qty || isNaN(price))
-    return res.status(400).json({ error: 'product_id, client_id, qty, price required' });
+  const client_id_int = parseInt(client_id);
+  if (!client_id_int || !items || !Array.isArray(items) || items.length === 0)
+    return res.status(400).json({ error: 'client_id and items array required' });
+
   const validStatuses = ['Pending', 'Paid'];
   const saleStatus = validStatuses.includes(status) ? status : 'Pending';
 
@@ -61,31 +73,64 @@ router.post('/', auth, async (req, res) => {
   try {
     await dbClient.query('BEGIN');
 
+    // Create sale
+    const { rows: saleRows } = await dbClient.query(
+      `INSERT INTO sales (date, client_id, status, stock_deducted, recorded_by)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [date || new Date(), client_id_int, saleStatus, false, req.user.id]
+    );
+    const sale = saleRows[0];
+
+    // Add items and check stock
     let stockDeducted = false;
-    if (saleStatus === 'Paid') {
+    const allItems = [];
+    
+    for (const item of items) {
+      const product_id = parseInt(item.product_id);
+      const qty = parseInt(item.qty);
+      const price = parseFloat(item.price);
+
+      if (!product_id || !qty || isNaN(price)) {
+        await dbClient.query('ROLLBACK');
+        return res.status(400).json({ error: 'Each item requires product_id, qty, price' });
+      }
+
       const stock = await checkStock(dbClient, product_id, qty);
       if (!stock.ok) {
         await dbClient.query('ROLLBACK');
         return res.status(409).json({ error: 'Insufficient stock', issues: stock.issues });
       }
-      await deductStock(dbClient, product_id, qty);
-      stockDeducted = true;
+
+      if (saleStatus === 'Paid') {
+        await deductStock(dbClient, product_id, qty);
+        stockDeducted = true;
+      }
+
+      const { rows: itemRows } = await dbClient.query(
+        `INSERT INTO sale_items (sale_id, product_id, qty, price)
+         VALUES ($1, $2, $3, $4) RETURNING *`,
+        [sale.id, product_id, qty, price]
+      );
+      allItems.push(itemRows[0]);
     }
 
-    const { rows } = await dbClient.query(
-      `INSERT INTO sales (date,product_id,client_id,qty,price,status,stock_deducted,recorded_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-      [date || new Date(), product_id, client_id, qty, price, saleStatus, stockDeducted, req.user.id]
-    );
+    // Update stock_deducted flag
+    if (stockDeducted) {
+      await dbClient.query('UPDATE sales SET stock_deducted=$1 WHERE id=$2', [true, sale.id]);
+    }
+
     await dbClient.query('COMMIT');
 
-    const sale = rows[0];
-    const { rows: pRows } = await pool.query('SELECT name FROM products WHERE id=$1', [product_id]);
-    const { rows: cRows } = await pool.query('SELECT name FROM clients WHERE id=$1', [client_id]);
+    // Log audit
+    const { rows: cRows } = await pool.query('SELECT name FROM clients WHERE id=$1', [client_id_int]);
+    const itemSummary = items.map((it, i) => {
+      const product = allItems[i];
+      return `${product.product_id} × ${product.qty}`;
+    }).join(', ');
     await logAudit(req.user.id, req.user.username, req.user.role, 'create', `Sale #${sale.id}`,
-      `${pRows[0]?.name} × ${qty} for ${cRows[0]?.name} — ${saleStatus}${stockDeducted ? ' (stock deducted)' : ''}`);
+      `${itemSummary} for ${cRows[0]?.name} — ${saleStatus}${stockDeducted ? ' (stock deducted)' : ''}`);
 
-    res.status(201).json(sale);
+    res.status(201).json({ ...sale, items: allItems });
   } catch (err) {
     await dbClient.query('ROLLBACK');
     throw err;
@@ -105,12 +150,18 @@ router.patch('/:id/status', auth, async (req, res) => {
   try {
     await dbClient.query('BEGIN');
 
-    const { rows } = await dbClient.query(
-      'SELECT s.*, p.name AS product_name FROM sales s JOIN products p ON p.id=s.product_id WHERE s.id=$1 FOR UPDATE',
+    const { rows: saleRows } = await dbClient.query(
+      'SELECT * FROM sales WHERE id=$1 FOR UPDATE',
       [req.params.id]
     );
-    const sale = rows[0];
+    const sale = saleRows[0];
     if (!sale) { await dbClient.query('ROLLBACK'); return res.status(404).json({ error: 'Not found' }); }
+
+    // Get all items for this sale
+    const { rows: items } = await dbClient.query(
+      'SELECT * FROM sale_items WHERE sale_id=$1',
+      [sale.id]
+    );
 
     // Validate transitions
     const from = sale.status;
@@ -128,16 +179,25 @@ router.patch('/:id/status', auth, async (req, res) => {
     let detail = `${from} → ${status}`;
 
     if (status === 'Paid' && !sale.stock_deducted) {
-      const stock = await checkStock(dbClient, sale.product_id, sale.qty);
-      if (!stock.ok) {
-        await dbClient.query('ROLLBACK');
-        return res.status(409).json({ error: 'Insufficient stock', issues: stock.issues });
+      // Check stock for all items
+      for (const item of items) {
+        const stock = await checkStock(dbClient, item.product_id, item.qty);
+        if (!stock.ok) {
+          await dbClient.query('ROLLBACK');
+          return res.status(409).json({ error: 'Insufficient stock', issues: stock.issues });
+        }
       }
-      await deductStock(dbClient, sale.product_id, sale.qty);
+      // Deduct stock for all items
+      for (const item of items) {
+        await deductStock(dbClient, item.product_id, item.qty);
+      }
       await dbClient.query('UPDATE sales SET status=$1, stock_deducted=true WHERE id=$2', [status, sale.id]);
       detail += ' (stock deducted)';
     } else if (status === 'Refunded' && sale.stock_deducted) {
-      await restoreStock(dbClient, sale.product_id, sale.qty);
+      // Restore stock for all items
+      for (const item of items) {
+        await restoreStock(dbClient, item.product_id, item.qty);
+      }
       await dbClient.query('UPDATE sales SET status=$1, stock_deducted=false WHERE id=$2', [status, sale.id]);
       detail += ' (stock restored)';
     } else {

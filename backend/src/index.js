@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const { runMigrations } = require('./db/migrate');
 
 const app = express();
 app.use(cors());
@@ -26,4 +27,15 @@ app.use((err, req, res, _next) => {
 });
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`API listening on :${PORT}`));
+
+async function start() {
+  try {
+    await runMigrations();
+    app.listen(PORT, () => console.log(`API listening on :${PORT}`));
+  } catch (err) {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  }
+}
+
+start();

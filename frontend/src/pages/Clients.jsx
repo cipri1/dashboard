@@ -128,7 +128,7 @@ export default function Clients() {
           <Field label={t('clientPhone')}><input value={form.phone} onChange={f('phone')} placeholder={t('phoneExample')} /></Field>
         </FormRow>
         <FormRow>
-          <Field label={t('clientPostcode')}><input value={form.postcode} onChange={f('postcode')} placeholder={t('postcodeExample')} /></Field>
+          <Field label={t('clientPostcode')}><input value={form.postcode} onChange={f('postcode')} placeholder={t('postcodeExample')} type="text" pattern="[0-9]{6}" maxLength="6" inputMode="numeric" /></Field>
         </FormRow>
         <FormRow>
           <Field label={t('clientAddress')}><textarea value={form.address} onChange={f('address')} placeholder={t('addressExample')} style={{ minHeight: 60 }} /></Field>

@@ -13,7 +13,15 @@ router.get('/', auth, async (req, res) => {
 
 // PUT update settings (admin only)
 router.put('/', auth, adminOnly, async (req, res) => {
-  const allowed = ['company_name','company_address','company_city','company_country','company_phone','company_email'];
+  const allowed = ['company_name','company_address','company_postcode','company_city','company_country','company_phone','company_email'];
+  
+  // Validate postal code if provided
+  if (req.body.company_postcode !== undefined && req.body.company_postcode !== '') {
+    if (!/^\d{6}$/.test(req.body.company_postcode)) {
+      return res.status(400).json({ error: 'Postal code must be exactly 6 numeric digits' });
+    }
+  }
+  
   const client = await pool.connect();
   try {
     await client.query('BEGIN');

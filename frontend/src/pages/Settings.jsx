@@ -4,12 +4,13 @@ import { useLanguage } from '../hooks/useLanguage';
 import { Card, Btn, FormRow, Field, Spinner, ErrorMsg } from '../components/ui';
 
 const FIELDS = [
-  { key: 'company_name',    labelKey: 'companyName',    placeholderKey: 'companyNameExample' },
-  { key: 'company_address', labelKey: 'streetAddress',  placeholderKey: 'streetAddressExample' },
-  { key: 'company_city',    labelKey: 'city',           placeholderKey: 'cityExample' },
-  { key: 'company_country', labelKey: 'country',        placeholderKey: 'countryExample' },
-  { key: 'company_phone',   labelKey: 'phone',          placeholderKey: 'phoneExample' },
-  { key: 'company_email',   labelKey: 'emailLabel',     placeholderKey: 'emailExample' },
+  { key: 'company_name',     labelKey: 'companyName',      placeholderKey: 'companyNameExample' },
+  { key: 'company_address',  labelKey: 'streetAddress',    placeholderKey: 'streetAddressExample' },
+  { key: 'company_postcode', labelKey: 'clientPostcode',   placeholderKey: 'postcodeExample' },
+  { key: 'company_city',     labelKey: 'city',             placeholderKey: 'cityExample' },
+  { key: 'company_country',  labelKey: 'country',          placeholderKey: 'countryExample' },
+  { key: 'company_phone',    labelKey: 'phone',            placeholderKey: 'phoneExample' },
+  { key: 'company_email',    labelKey: 'emailLabel',       placeholderKey: 'emailExample' },
 ];
 
 export default function Settings() {
@@ -61,12 +62,24 @@ export default function Settings() {
         <FormRow cols={2}>
           {FIELDS.slice(2, 4).map(f2 => (
             <Field key={f2.key} label={t(f2.labelKey)}>
-              <input value={form[f2.key] || ''} onChange={f(f2.key)} placeholder={t(f2.placeholderKey)} />
+              <input 
+                value={form[f2.key] || ''} 
+                onChange={f(f2.key)} 
+                placeholder={t(f2.placeholderKey)}
+                {...(f2.key === 'company_postcode' ? { type: 'text', pattern: '[0-9]{6}', maxLength: 6, inputMode: 'numeric' } : {})}
+              />
             </Field>
           ))}
         </FormRow>
         <FormRow cols={2}>
           {FIELDS.slice(4, 6).map(f2 => (
+            <Field key={f2.key} label={t(f2.labelKey)}>
+              <input value={form[f2.key] || ''} onChange={f(f2.key)} placeholder={t(f2.placeholderKey)} />
+            </Field>
+          ))}
+        </FormRow>
+        <FormRow cols={2}>
+          {FIELDS.slice(6, 7).map(f2 => (
             <Field key={f2.key} label={t(f2.labelKey)}>
               <input value={form[f2.key] || ''} onChange={f(f2.key)} placeholder={t(f2.placeholderKey)} />
             </Field>
@@ -103,7 +116,7 @@ export default function Settings() {
           <div style={{ fontSize: 8, color: 'var(--color-text-secondary)', fontWeight: 700, marginBottom: 4 }}>{t('shippingLabelFrom')}</div>
           <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 2 }}>{form.company_name || '—'}</div>
           <div style={{ fontSize: 10, marginBottom: 1 }}>{form.company_address || '—'}</div>
-          <div style={{ fontSize: 10, marginBottom: 1 }}>{form.company_city || '—'}</div>
+          <div style={{ fontSize: 10, marginBottom: 1 }}>{form.company_postcode || '—'} {form.company_city || '—'}</div>
           <div style={{ fontSize: 10, marginBottom: 1 }}>{form.company_country || '—'}</div>
           <div style={{ fontSize: 9, color: 'var(--color-text-secondary)', marginBottom: 10 }}>{form.company_phone || '—'} &nbsp; {form.company_email || '—'}</div>
 
@@ -113,7 +126,7 @@ export default function Settings() {
           <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>{t('previewClientName')}</div>
           <div style={{ fontSize: 10, marginBottom: 1 }}>{t('previewCompanyName')}</div>
           <div style={{ fontSize: 10, marginBottom: 1 }}>{t('previewAddress')}</div>
-          <div style={{ fontSize: 10, marginBottom: 8 }}>{t('previewCityCountry')}</div>
+          <div style={{ fontSize: 10, marginBottom: 8 }}>12345 {t('previewCityCountry')}</div>
 
           <div style={{ background: 'var(--color-background-secondary)', border: '0.5px solid var(--color-border-secondary)', borderRadius: 3, padding: '6px 8px' }}>
             <div style={{ fontSize: 8, color: 'var(--color-text-secondary)', fontWeight: 700, marginBottom: 3 }}>{t('shippingLabelProduct')}</div>

@@ -45,6 +45,12 @@ router.get('/', auth, async (req, res) => {
 router.post('/', auth, async (req, res) => {
   const { name, company, email, phone, address, postcode } = req.body;
   if (!name) return res.status(400).json({ error: 'Name required' });
+  
+  // Validate postal code if provided
+  if (postcode && !/^\d{6}$/.test(postcode)) {
+    return res.status(400).json({ error: 'Postal code must be exactly 6 numeric digits' });
+  }
+  
   const { rows } = await insertClient({ name, company, email, phone, address, postcode });
   await logAudit(req.user.id, req.user.username, req.user.role, 'create', `Client: ${name}`, company || '');
   res.status(201).json(rows[0]);

@@ -5,19 +5,37 @@ const { generateLabel } = require('../label');
 
 router.get('/sales/:id/label', auth, async (req, res) => {
   try {
-    // Fetch sale with product and client
+    const lang = req.query.lang || 'en';
+    
+    // Check if postcode column exists
+    const { rows: columnCheck } = await pool.query(`
+      SELECT EXISTS(
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name='clients' AND column_name='postcode'
+      ) as postcode_exists
+    `);
+    
+    const postcodeExists = columnCheck[0]?.postcode_exists || false;
+    
+    // Fetch sale with client
     const { rows: saleRows } = await pool.query(`
-      SELECT s.*, p.name AS product_name, p.sku AS product_sku,
-             c.name AS client_name, c.company, c.address, c.phone, c.email
+      SELECT s.*, c.name AS client_name, c.company, c.address, ${postcodeExists ? 'c.postcode' : 'NULL::varchar as postcode'}, c.phone, c.email
       FROM sales s
-      JOIN products p ON p.id = s.product_id
       JOIN clients c ON c.id = s.client_id
       WHERE s.id = $1
     `, [req.params.id]);
 
     if (!saleRows.length) return res.status(404).json({ error: 'Sale not found' });
 
-    const row = saleRows[0];
+    const sale = saleRows[0];
+
+    // Fetch all items for this sale
+    const { rows: items } = await pool.query(`
+      SELECT si.*, p.name AS product_name, p.sku
+      FROM sale_items si
+      JOIN products p ON p.id = si.product_id
+      WHERE si.sale_id = $1
+    `, [req.params.id]);
 
     // Fetch company settings
     const { rows: settingRows } = await pool.query('SELECT key, value FROM settings');
@@ -26,22 +44,24 @@ router.get('/sales/:id/label', auth, async (req, res) => {
 
     const pdf = generateLabel({
       sale: {
-        id:   row.id,
-        date: row.date,
-        qty:  row.qty,
+        id:   sale.id,
+        date: sale.date,
       },
-      product: {
-        name: row.product_name,
-        sku:  row.product_sku,
-      },
+      items: items.map(item => ({
+        name: item.product_name,
+        sku: item.sku,
+        qty: item.qty,
+      })),
       client: {
-        name:    row.client_name,
-        company: row.company,
-        address: row.address,
-        phone:   row.phone,
-        email:   row.email,
+        name:    sale.client_name,
+        company: sale.company,
+        address: sale.address,
+        postcode: sale.postcode,
+        phone:   sale.phone,
+        email:   sale.email,
       },
       company,
+      lang,
     });
 
     res.setHeader('Content-Type', 'application/pdf');
