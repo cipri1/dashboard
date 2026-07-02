@@ -5,5 +5,6 @@ COPY package.json ./
 RUN npm install --omit=dev
 RUN pip3 install reportlab --break-system-packages --quiet
 COPY src/ ./src/
+COPY migrations/ ./migrations/
 EXPOSE 4000
 CMD ["node", "src/index.js"]

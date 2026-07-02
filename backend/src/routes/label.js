@@ -65,7 +65,7 @@ router.get('/sales/:id/label', auth, async (req, res) => {
     });
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="label_sale_${row.id}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="label_sale_${sale.id}.pdf"`);
     res.setHeader('Content-Length', pdf.length);
     res.send(pdf);
   } catch (err) {

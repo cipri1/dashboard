@@ -15,8 +15,8 @@ export default function Overview() {
   if (!data) return <Spinner />;
   const { sales, parts, clients, products } = data;
 
-  const paidRev = sales.filter(s => s.status === 'Paid').reduce((a, s) => a + s.qty * s.price, 0);
-  const pendingRev = sales.filter(s => s.status === 'Pending').reduce((a, s) => a + s.qty * s.price, 0);
+  const paidRev = sales.filter(s => s.status === 'Paid').reduce((a, s) => a + (s.items || []).reduce((sum, item) => sum + item.qty * item.price, 0), 0);
+  const pendingRev = sales.filter(s => s.status === 'Pending').reduce((a, s) => a + (s.items || []).reduce((sum, item) => sum + item.qty * item.price, 0), 0);
   const aborted = sales.filter(s => s.status === 'Aborted').length;
   const lowOrOut = parts.filter(p => p.qty < p.min_stock);
   const productStocks = products.map(p => ({ ...p, stock: p.qty || 0 }));
@@ -69,14 +69,19 @@ export default function Overview() {
       <div style={{ marginTop: '1rem' }}>
         <Card title={t('overviewRecentSales')}>
           <table><thead><tr><th>{t('overviewTableProduct')}</th><th>{t('overviewTableClient')}</th><th>{t('overviewTableStatus')}</th><th>{t('overviewTableTotal')}</th></tr></thead>
-            <tbody>{recent.map(s => (
-              <tr key={s.id}>
-                <td>{s.product_name}</td>
-                <td>{s.client_name}</td>
-                <td>{saleBadge(s.status, t(`status${s.status}`))}</td>
-                <td>{fmt(s.qty * s.price)}</td>
-              </tr>
-            ))}</tbody></table>
+            <tbody>{recent.map(s => {
+              const items = s.items || [];
+              const itemsStr = items.map(i => i.product_name).join(', ') || '—';
+              const total = items.reduce((sum, item) => sum + item.qty * item.price, 0);
+              return (
+                <tr key={s.id}>
+                  <td>{itemsStr}</td>
+                  <td>{s.client_name}</td>
+                  <td>{saleBadge(s.status, t(`status${s.status}`))}</td>
+                  <td>{fmt(total)}</td>
+                </tr>
+              );
+            })}</tbody></table>
         </Card>
       </div>
     </div>

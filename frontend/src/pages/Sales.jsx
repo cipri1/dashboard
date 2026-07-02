@@ -31,29 +31,83 @@ export default function Sales() {
   const firstClient = clients[0];
   setForm({
     ...emptySale,
-    product_id: firstProd?.id || '',
     client_id:  firstClient?.id || '',
-    price:      firstProd?.price || '',
     date:       new Date().toISOString().slice(0, 10),
+    items:      firstProd?.id ? [{ product_id: firstProd.id, qty: 1, price: firstProd.price }] : []
   });
   setErr(''); setStockWarn(''); setOpen(true);
 }
 
-  function handleProductChange(e) {
-    const prod = products.find(p => p.id === parseInt(e.target.value));
-    setForm(v => ({ ...v, product_id: parseInt(e.target.value), price: prod?.price || '' }));
-  }
+ function handleProductChange(index, e) {
+   const prod = products.find(p => p.id === parseInt(e.target.value));
+   setForm(v => {
+     const newItems = [...v.items];
+     newItems[index] = { ...newItems[index], product_id: parseInt(e.target.value), price: prod?.price || '' };
+     return { ...v, items: newItems };
+   });
+ }
 
-  async function save() {
-    setErr('');
-    try {
-      await api.createSale({ ...form, product_id: parseInt(form.product_id), client_id: parseInt(form.client_id), qty: parseInt(form.qty), price: parseFloat(form.price) });
-      setOpen(false); load();
-    } catch (e) {
-      if (e.message.includes('stock') || e.message.includes('Insufficient')) setStockWarn(e.message);
-      else setErr(e.message);
-    }
-  }
+ function handleItemQtyChange(index, e) {
+   const newQty = parseInt(e.target.value);
+   setForm(v => {
+     const newItems = [...v.items];
+     newItems[index] = { ...newItems[index], qty: newQty };
+     return { ...v, items: newItems };
+   });
+ }
+
+ function handleItemPriceChange(index, e) {
+   const newPrice = parseFloat(e.target.value);
+   setForm(v => {
+     const newItems = [...v.items];
+     newItems[index] = { ...newItems[index], price: newPrice };
+     return { ...v, items: newItems };
+   });
+ }
+
+ function addItem() {
+   const firstProd = products[0];
+   setForm(v => ({
+     ...v,
+     items: [...v.items, { product_id: firstProd?.id || '', qty: 1, price: firstProd?.price || '' }]
+   }));
+ }
+
+ function removeItem(index) {
+   setForm(v => ({
+     ...v,
+     items: v.items.filter((_, i) => i !== index)
+   }));
+ }
+
+ async function save() {
+   setErr('');
+   try {
+     if (!form.client_id) {
+       setErr(t('clientRequired'));
+       return;
+     }
+     if (!form.items || form.items.length === 0) {
+       setErr(t('itemsRequired'));
+       return;
+     }
+     const saleData = {
+       date: form.date,
+       status: form.status,
+       client_id: parseInt(form.client_id),
+       items: form.items.map(item => ({
+         product_id: parseInt(item.product_id),
+         qty: parseInt(item.qty),
+         price: parseFloat(item.price)
+       }))
+     };
+     await api.createSale(saleData);
+     setOpen(false); load();
+   } catch (e) {
+     if (e.message.includes('stock') || e.message.includes('Insufficient')) setStockWarn(e.message);
+     else setErr(e.message);
+   }
+ }
 
   async function changeStatus(saleId, newStatus) {
     try {
@@ -113,17 +167,18 @@ export default function Sales() {
 
       <Card title={t('salesRecords')} action={<Btn variant="primary" sm onClick={openAdd}><i className="ti ti-plus" /> {t('recordSale')}</Btn>}>
         <table>
-          <thead><tr><th>{t('date')}</th><th>{t('saleProduct')}</th><th>{t('saleClient')}</th><th>{t('saleQty')}</th><th>{t('salePrice')}</th><th>{t('saleTotal')}</th><th>{t('status')}</th><th>{t('by')}</th><th>{t('actions')}</th></tr></thead>
+          <thead><tr><th>{t('date')}</th><th>{t('saleProducts')}</th><th>{t('saleClient')}</th><th>{t('saleTotal')}</th><th>{t('status')}</th><th>{t('by')}</th><th>{t('actions')}</th></tr></thead>
           <tbody>{sales.map(s => {
             const locked = s.status === 'Aborted' || s.status === 'Refunded';
+            const items = s.items || [];
+            const total = items.reduce((sum, item) => sum + (item.qty * item.price), 0);
+            const itemsStr = items.map(i => `${i.product_name} × ${i.qty}`).join(', ');
             return (
               <tr key={s.id} style={locked ? { opacity: 0.55 } : {}}>
                 <td>{s.date?.slice(0, 10)}</td>
-                <td title={s.product_name}>{s.product_name}</td>
+                <td title={itemsStr}>{itemsStr || '—'}</td>
                 <td>{s.client_name}</td>
-                <td>{s.qty}</td>
-                <td>{fmt(s.price)}</td>
-                <td style={{ fontWeight: 500 }}>{fmt(s.qty * s.price)}</td>
+                <td style={{ fontWeight: 500 }}>{fmt(total)}</td>
                 <td>{saleBadge(s.status, t(`status${s.status}`))}</td>
                 <td style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>{s.recorded_by_name}</td>
                 <td><div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
@@ -143,22 +198,47 @@ export default function Sales() {
           <i className="ti ti-alert-triangle" /> {stockWarn}
         </div>}
         <FormRow cols={2}>
-          <Field label={t('saleProduct')}>
-            <select value={form.product_id} onChange={handleProductChange}>
-              {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </Field>
           <Field label={t('saleClient')}>
             <select value={form.client_id} onChange={f('client_id')}>
+              <option value="">— {t('selectClient')} —</option>
               {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </Field>
-        </FormRow>
-        <FormRow cols={3}>
           <Field label={t('date')}><input type="date" value={form.date} onChange={f('date')} /></Field>
-          <Field label={t('saleQty')}><input type="number" min="1" value={form.qty} onChange={f('qty')} /></Field>
-          <Field label={t('salePrice')}><input type="number" min="0" step="0.01" value={form.price} onChange={f('price')} /></Field>
         </FormRow>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>{t('saleItems')}</span>
+            <Btn sm variant="success" onClick={addItem}><i className="ti ti-plus" /> {t('addItem')}</Btn>
+          </div>
+          <div style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--border-radius-md)', overflow: 'hidden' }}>
+            {form.items && form.items.length > 0 ? (
+              form.items.map((item, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: 8, padding: 10, borderBottom: idx < form.items.length - 1 ? '1px solid var(--color-border)' : 'none', alignItems: 'flex-end' }}>
+                  <div style={{ flex: 2 }}>
+                    <label style={{ fontSize: 11, fontWeight: 500, display: 'block', marginBottom: 4 }}>{t('saleProduct')}</label>
+                    <select value={item.product_id || ''} onChange={(e) => handleProductChange(idx, e)} style={{ width: '100%' }}>
+                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 11, fontWeight: 500, display: 'block', marginBottom: 4 }}>{t('saleQty')}</label>
+                    <input type="number" min="1" value={item.qty || 1} onChange={(e) => handleItemQtyChange(idx, e)} style={{ width: '100%' }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 11, fontWeight: 500, display: 'block', marginBottom: 4 }}>{t('salePrice')}</label>
+                    <input type="number" min="0" step="0.01" value={item.price || ''} onChange={(e) => handleItemPriceChange(idx, e)} style={{ width: '100%' }} />
+                  </div>
+                  <Btn sm variant="danger" onClick={() => removeItem(idx)}><i className="ti ti-trash" /></Btn>
+                </div>
+              ))
+            ) : (
+              <div style={{ padding: 20, textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 12 }}>{t('noItems')}</div>
+            )}
+          </div>
+        </div>
+
         <FormRow>
           <Field label={t('saleStatusField')}>
             <select value={form.status} onChange={f('status')}>
@@ -181,26 +261,32 @@ export default function Sales() {
       {statusSale && (
         <Modal open onClose={() => setStatusSale(null)} title={t('updateSaleTitle', { id: statusSale.id })}>
           <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: '1rem', padding: 10, background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)' }}>
-            <strong style={{ fontWeight: 500 }}>{statusSale.product_name}</strong> × {statusSale.qty} &nbsp;·&nbsp; {statusSale.client_name} &nbsp;·&nbsp; {fmt(statusSale.qty * statusSale.price)}
-            <br /><span style={{ marginTop: 4, display: 'inline-block' }}>{t('current')}: {saleBadge(statusSale.status, t(`status${statusSale.status}`))}</span>
-          </div>
-          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: 8 }}>{t('chooseNewStatus')}</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {(transitions[statusSale.status] || []).length === 0
-              ? <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{t('saleLockedCannotChange')}</div>
-              : transitions[statusSale.status].map(st => {
-                const info = transitionLabels[st];
-                return (
-                  <button key={st} className={`btn btn-${info.variant}`} style={{ textAlign: 'left', width: '100%', padding: '10px 14px' }}
-                    onClick={() => changeStatus(statusSale.id, st)}>
-                    <strong style={{ fontWeight: 500 }}>{info.label}</strong><br />
-                    <span style={{ fontSize: 11, fontWeight: 400 }}>{info.sub}</span>
-                  </button>
-                );
-              })}
-          </div>
-          <ModalActions><Btn onClick={() => setStatusSale(null)}>{t('cancel')}</Btn></ModalActions>
-        </Modal>
+           {statusSale.items?.map((item, i) => (
+             <div key={i}>
+               <strong style={{ fontWeight: 500 }}>{item.product_name}</strong> × {item.qty} @ {fmt(item.price)}
+               {i < statusSale.items.length - 1 && ' · '}
+             </div>
+           ))}
+           <br /><span style={{ marginTop: 4, display: 'inline-block' }}>{t('client')}: {statusSale.client_name}</span>
+           <br /><span style={{ marginTop: 4, display: 'inline-block' }}>{t('current')}: {saleBadge(statusSale.status, t(`status${statusSale.status}`))}</span>
+         </div>
+         <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-secondary)', marginBottom: 8 }}>{t('chooseNewStatus')}</div>
+         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+           {(transitions[statusSale.status] || []).length === 0
+             ? <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>{t('saleLockedCannotChange')}</div>
+             : transitions[statusSale.status].map(st => {
+               const info = transitionLabels[st];
+               return (
+                 <button key={st} className={`btn btn-${info.variant}`} style={{ textAlign: 'left', width: '100%', padding: '10px 14px' }}
+                   onClick={() => changeStatus(statusSale.id, st)}>
+                   <strong style={{ fontWeight: 500 }}>{info.label}</strong><br />
+                   <span style={{ fontSize: 11, fontWeight: 400 }}>{info.sub}</span>
+                 </button>
+               );
+             })}
+         </div>
+         <ModalActions><Btn onClick={() => setStatusSale(null)}>{t('cancel')}</Btn></ModalActions>
+       </Modal>
       )}
 
       <ConfirmDialog />
